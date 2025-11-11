@@ -338,7 +338,38 @@ app.get("/", (req, res) => {
       res.status(500).send("⚠ Error al registrar embarazada: " + err.message);
     }
   });
+  /* ============================================================
+   LISTAR EMBARAZADAS CON DIRECCIÓN
+   ============================================================ */
+    app.get("/embarazadas-direcciones", async (req, res) => {
+      try {
+        const result = await getConnection()
+          .request()
+          .query(`
+            SELECT 
+              e.ID_Embarazada,
+              e.Nombre,
+              e.Edad,
+              e.Telefono,
+              e.ID_Direccion,
+              d.Calle,
+              d.Ciudad,
+              d.Municipio,
+              d.Departamento,
+              d.Zona,
+              d.Avenida,
+              d.NumeroCasa
+            FROM Embarazada e
+            INNER JOIN Direccion d ON e.ID_Direccion = d.ID_Direccion
+            ORDER BY e.ID_Embarazada ASC
+          `);
 
+        res.json(result.recordset);
+      } catch (err) {
+        console.error("⚠ Error al obtener embarazadas con dirección:", err);
+        res.status(500).send("⚠ Error al obtener embarazadas con dirección");
+      }
+    });
 
   /*ACTUALIZAR EMBARAZADA*/
   app.put("/embarazadas/:id", async (req, res) => {
