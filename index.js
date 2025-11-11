@@ -363,43 +363,36 @@ app.get("/", (req, res) => {
   });
 
   /*ELIMINAR EMBARAZADA + RELACIONES*/
-    app.delete("/embarazadas/:id", async (req, res) => {
-      const { id } = req.params;
+  app.delete("/embarazadas/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const pool = getConnection();
 
-      try {
-        const pool = await getConnection();
+      // Luego elimina de Riesgo
+      await pool
+        .request()
+        .input("ID", id)
+        .query("DELETE FROM Riesgo WHERE ID_Embarazada = @ID");
 
-        // Primero obtener el ID_Direccion asociado
-        const direccionResult = await pool
-          .request()
-          .input("ID", id)
-          .query("SELECT ID_Direccion FROM Embarazada WHERE ID_Embarazada = @ID");
+      // Luego elimina de Seguimiento
+      await pool
+        .request()
+        .input("ID", id)
+        .query("DELETE FROM Seguimiento WHERE ID_Embarazada = @ID");
 
-        const idDireccion = direccionResult.recordset[0]?.ID_Direccion;
+      // Finalmente elimina a la embarazada
+      await pool
+        .request()
+        .input("ID", id)
+        .query("DELETE FROM Embarazada WHERE ID_Embarazada = @ID");
 
-        // Luego elimina de Riesgo
-        await pool.request().input("ID", id).query("DELETE FROM Riesgo WHERE ID_Embarazada = @ID");
-
-        // Luego elimina de Seguimiento
-        await pool.request().input("ID", id).query("DELETE FROM Seguimiento WHERE ID_Embarazada = @ID");
-
-        // Finalmente elimina a la embarazada
-        await pool.request().input("ID", id).query("DELETE FROM Embarazada WHERE ID_Embarazada = @ID");
-
-        // Si tenía dirección, también eliminarla
-        if (idDireccion) {
-          await pool
-            .request()
-            .input("ID_Direccion", idDireccion)
-            .query("DELETE FROM Direccion WHERE ID_Direccion = @ID_Direccion");
-        }
-
-        res.send("🗑️ Embarazada, su dirección y registros relacionados eliminados correctamente");
-      } catch (err) {
-        res.status(500).send("⚠ Error al eliminar: " + err.message);
-      }
-    });
-
+      res.send(
+        "🗑️ Embarazada y todos sus registros relacionados eliminados correctamente"
+      );
+    } catch (err) {
+      res.status(500).send("⚠ Error al eliminar: " + err.message);
+    }
+  });
 
   /* ============================================================
      CRUD SEGUIMIENTO
