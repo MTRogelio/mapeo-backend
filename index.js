@@ -202,58 +202,57 @@ app.get("/", (req, res) => {
     /* ============================================================
       CRUD DIRECCION
     ============================================================ */
-  app.get("/direcciones", async (req, res) => {
-    try {
-      const result = await getConnection()
-        .request()
-        .query("SELECT * FROM Direccion"); // Incluye Municipio automáticamente
-      res.json(result.recordset);
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
+    app.get("/direcciones", async (req, res) => {
+      try {
+        const result = await getConnection()
+          .request()
+          .query("SELECT * FROM Direccion");
+        res.json(result.recordset);
+      } catch (err) {
+        res.status(500).send(err.message);
+      }
+    });
 
-  app.post("/direcciones", async (req, res) => {
-    const { Calle, Ciudad, Departamento, Latitud, Longitud, Zona, Avenida, NumeroCasa, Municipio } = req.body;
+    app.post("/direcciones", async (req, res) => {
+      const { Calle, Ciudad, Departamento, Latitud, Longitud, Zona, Avenida, NumeroCasa, Municipio } = req.body;
 
-    try {
-      const result = await getConnection()
-        .request()
-        .input("Calle", Calle)
-        .input("Ciudad", Ciudad)
-        .input("Departamento", Departamento)
-        .input("Latitud", Latitud)
-        .input("Longitud", Longitud)
-        .input("Zona", Zona || null)
-        .input("Avenida", Avenida || null)
-        .input("NumeroCasa", NumeroCasa)
-        .input("Municipio", Municipio)
-        .query(`
-          INSERT INTO Direccion (Calle, Ciudad, Departamento, Latitud, Longitud, Zona, Avenida, NumeroCasa, Municipio)
-          OUTPUT INSERTED.ID_Direccion 
-          VALUES (@Calle, @Ciudad, @Departamento, @Latitud, @Longitud, @Zona, @Avenida, @NumeroCasa, @Municipio)
-        `);
+      try {
+        const result = await getConnection()
+          .request()
+          .input("Calle", Calle)
+          .input("Ciudad", Ciudad)
+          .input("Departamento", Departamento)
+          .input("Latitud", Latitud)
+          .input("Longitud", Longitud)
+          .input("Zona", Zona || null)
+          .input("Avenida", Avenida || null)
+          .input("NumeroCasa", NumeroCasa)
+          .input("Municipio", Municipio)
+          .query(`
+            INSERT INTO Direccion (Calle, Ciudad, Departamento, Latitud, Longitud, Zona, Avenida, NumeroCasa, Municipio)
+            OUTPUT INSERTED.ID_Direccion 
+            VALUES (@Calle, @Ciudad, @Departamento, @Latitud, @Longitud, @Zona, @Avenida, @NumeroCasa, @Municipio)
+          `);
 
-      res.status(201).json({ ID_Direccion: result.recordset[0].ID_Direccion });
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
+        res.status(201).json({ ID_Direccion: result.recordset[0].ID_Direccion });
+      } catch (err) {
+        res.status(500).send(err.message);
+      }
+    });
 
-  // Eliminar dirección
-  app.delete("/direcciones/:id", async (req, res) => {
-    const { id } = req.params;
-    try {
-      await getConnection()
-        .request()
-        .input("ID_Direccion", id)
-        .query("DELETE FROM Direccion WHERE ID_Direccion = @ID_Direccion");
+    app.delete("/direcciones/:id", async (req, res) => {
+      const { id } = req.params;
+      try {
+        await getConnection()
+          .request()
+          .input("ID_Direccion", id)
+          .query("DELETE FROM Direccion WHERE ID_Direccion = @ID_Direccion");
 
-      res.sendStatus(204);
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
+        res.sendStatus(204);
+      } catch (err) {
+        res.status(500).send(err.message);
+      }
+    });
 
 
   /* ============================================================
@@ -282,187 +281,310 @@ app.get("/", (req, res) => {
     }
   });
 
-  // Registrar embarazada con dirección
+  // ====== REGISTRAR EMBARAZADA CON TRANSACCIÓN ======
   app.post("/embarazadas", async (req, res) => {
     const {
       Nombre,
+      DPI,
       Edad,
       Telefono,
       Calle,
       Ciudad,
+      Municipio,
       Departamento,
-      Latitud,
-      Longitud,
       Zona,
       Avenida,
       NumeroCasa,
-      Municipio
+      Latitud,
+      Longitud,
     } = req.body;
 
+    // ====== VALIDACIONES BACKEND ======
+    
+    // 1. Validar campos obligatorios
+    if (!Nombre || !DPI || !Edad || !Telefono || !Calle || !Ciudad || 
+        !Municipio || !Departamento || !NumeroCasa) {
+      return res.status(400).json({ 
+        error: "⚠ Todos los campos obligatorios deben estar completos" 
+      });
+    }
+
+    // 2. Validar DPI (13 dígitos)
+    if (!/^\d{13}$/.test(DPI)) {
+      return res.status(400).json({ 
+        error: "⚠ El DPI debe tener exactamente 13 dígitos numéricos" 
+      });
+    }
+
+    // 3. Validar Teléfono (8 dígitos)
+    if (!/^\d{8}$/.test(Telefono)) {
+      return res.status(400).json({ 
+        error: "⚠ El teléfono debe tener exactamente 8 dígitos numéricos" 
+      });
+    }
+
+    // 4. Validar Número de Casa (solo números)
+    if (!/^\d+$/.test(NumeroCasa)) {
+      return res.status(400).json({ 
+        error: "⚠ El número de casa debe contener solo números" 
+      });
+    }
+
+    // 5. Validar Edad
+    if (Edad <= 0 || Edad > 120) {
+      return res.status(400).json({ 
+        error: "⚠ La edad debe ser un número válido entre 1 y 120" 
+      });
+    }
+
     try {
-      const pool = await getConnection();
+      const pool = getConnection();
+      const transaction = pool.transaction();
 
-      // Verificar teléfono duplicado
-      const existe = await pool
-        .request()
-        .input("Telefono", Telefono)
-        .query("SELECT 1 FROM Embarazada WHERE Telefono = @Telefono");
+      await transaction.begin();
 
-      if (existe.recordset.length > 0) {
-        return res.status(400).json({ error: "⚠ El número de teléfono ya está registrado" });
+      try {
+        // ====== VERIFICAR DUPLICADOS ======
+        
+        // 1. Verificar DPI duplicado
+        const checkDPI = await transaction
+          .request()
+          .input("DPI", DPI)
+          .query("SELECT 1 FROM Embarazada WHERE DPI = @DPI");
+
+        if (checkDPI.recordset.length > 0) {
+          await transaction.rollback();
+          return res.status(409).json({ 
+            error: "⚠ Ya existe una embarazada registrada con ese DPI" 
+          });
+        }
+
+        // 2. Verificar Teléfono duplicado
+        const checkTelefono = await transaction
+          .request()
+          .input("Telefono", Telefono)
+          .query("SELECT 1 FROM Embarazada WHERE Telefono = @Telefono");
+
+        if (checkTelefono.recordset.length > 0) {
+          await transaction.rollback();
+          return res.status(409).json({ 
+            error: "⚠ Ya existe una embarazada registrada con ese teléfono" 
+          });
+        }
+
+        // 3. Verificar dirección duplicada (Nombre + NumeroCasa en mismo municipio)
+        const checkDireccion = await transaction
+          .request()
+          .input("Nombre", Nombre)
+          .input("NumeroCasa", NumeroCasa)
+          .input("Municipio", Municipio)
+          .query(`
+            SELECT 1 FROM Embarazada e
+            INNER JOIN Direccion d ON e.ID_Direccion = d.ID_Direccion
+            WHERE e.Nombre = @Nombre 
+              AND d.NumeroCasa = @NumeroCasa
+              AND d.Municipio = @Municipio
+          `);
+
+        if (checkDireccion.recordset.length > 0) {
+          await transaction.rollback();
+          return res.status(409).json({ 
+            error: "⚠ Ya existe una embarazada con ese nombre y número de casa en este municipio" 
+          });
+        }
+
+        // ====== INSERTAR DIRECCIÓN ======
+        const direccionResult = await transaction
+          .request()
+          .input("Calle", Calle)
+          .input("Ciudad", Ciudad)
+          .input("Municipio", Municipio)
+          .input("Departamento", Departamento)
+          .input("Zona", Zona || null)
+          .input("Avenida", Avenida || null)
+          .input("NumeroCasa", NumeroCasa)
+          .input("Latitud", Latitud || null)
+          .input("Longitud", Longitud || null)
+          .query(`
+            INSERT INTO Direccion (Calle, Ciudad, Municipio, Departamento, Zona, Avenida, NumeroCasa, Latitud, Longitud)
+            OUTPUT INSERTED.ID_Direccion
+            VALUES (@Calle, @Ciudad, @Municipio, @Departamento, @Zona, @Avenida, @NumeroCasa, @Latitud, @Longitud)
+          `);
+
+        const idDireccion = direccionResult.recordset[0].ID_Direccion;
+
+        // ====== INSERTAR EMBARAZADA ======
+        const embarazadaResult = await transaction
+          .request()
+          .input("Nombre", Nombre)
+          .input("DPI", DPI)
+          .input("Edad", Edad)
+          .input("Telefono", Telefono)
+          .input("ID_Direccion", idDireccion)
+          .query(`
+            INSERT INTO Embarazada (Nombre, DPI, Edad, Telefono, ID_Direccion)
+            OUTPUT INSERTED.ID_Embarazada
+            VALUES (@Nombre, @DPI, @Edad, @Telefono, @ID_Direccion)
+          `);
+
+        // Confirmar transacción
+        await transaction.commit();
+
+        res.status(201).json({ 
+          message: "✅ Embarazada registrada correctamente",
+          data: {
+            ID_Embarazada: embarazadaResult.recordset[0].ID_Embarazada,
+            ID_Direccion: idDireccion
+          }
+        });
+
+      } catch (err) {
+        // Si hay error, deshacer todo
+        await transaction.rollback();
+        throw err;
       }
 
-      // Ejecutar SP actualizado (debes agregar @Municipio en SQL)
-      const result = await pool
-        .request()
-        .input("Nombre", Nombre)
-        .input("Edad", Edad)
-        .input("Telefono", Telefono)
-        .input("Calle", Calle)
-        .input("Ciudad", Ciudad)
-        .input("Departamento", Departamento)
-        .input("Latitud", Latitud || null)
-        .input("Longitud", Longitud || null)
-        .input("Zona", Zona || null)
-        .input("Avenida", Avenida || null)
-        .input("NumeroCasa", NumeroCasa)
-        .input("Municipio", Municipio)
-        .execute("sp_InsertarEmbarazadaConDireccion");
-
-      res.status(201).json({
-        message: "✅ Embarazada y dirección registradas correctamente",
-        data: result.recordset[0],
-      });
     } catch (err) {
       console.error("⚠ Error al registrar embarazada:", err);
-      res.status(500).send("⚠ Error al registrar embarazada: " + err.message);
+      res.status(500).json({ 
+        error: "⚠ Error interno del servidor: " + err.message 
+      });
     }
   });
 
 
-  /*ACTUALIZAR EMBARAZADA*/
+  // ====== ACTUALIZAR EMBARAZADA ======
   app.put("/embarazadas/:id", async (req, res) => {
     const { id } = req.params;
-    const { Nombre, Edad, Telefono, ID_Direccion } = req.body;
-    try {
-      await getConnection()
-        .request()
-        .input("ID", id)
-        .input("Nombre", Nombre)
-        .input("Edad", Edad)
-        .input("TELEFONO", Telefono)
-        .input("ID_Direccion", ID_Direccion).query(`
-        UPDATE Embarazada
-        SET Nombre=@Nombre, Edad=@Edad, Telefono=@TELEFONO, ID_Direccion=@ID_Direccion
-        WHERE ID_Embarazada=@ID
-      `);
-      res.send("✅ Embarazada actualizada correctamente");
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
+    const { Nombre, DPI, Edad, Telefono, ID_Direccion } = req.body;
 
-  /*ELIMINAR EMBARAZADA + RELACIONES*/
-  app.delete("/embarazadas/:id", async (req, res) => {
-    const { id } = req.params;
+    // Validaciones
+    if (DPI && !/^\d{13}$/.test(DPI)) {
+      return res.status(400).json({ 
+        error: "⚠ El DPI debe tener exactamente 13 dígitos numéricos" 
+      });
+    }
+
+    if (Telefono && !/^\d{8}$/.test(Telefono)) {
+      return res.status(400).json({ 
+        error: "⚠ El teléfono debe tener exactamente 8 dígitos numéricos" 
+      });
+    }
+
     try {
       const pool = getConnection();
 
-      // Luego elimina de Riesgo
-      await pool
-        .request()
-        .input("ID", id)
-        .query("DELETE FROM Riesgo WHERE ID_Embarazada = @ID");
+      // Verificar duplicados (excluyendo el registro actual)
+      if (DPI) {
+        const checkDPI = await pool
+          .request()
+          .input("DPI", DPI)
+          .input("ID", id)
+          .query("SELECT 1 FROM Embarazada WHERE DPI = @DPI AND ID_Embarazada != @ID");
 
-      // Luego elimina de Seguimiento
-      await pool
-        .request()
-        .input("ID", id)
-        .query("DELETE FROM Seguimiento WHERE ID_Embarazada = @ID");
-
-      // Finalmente elimina a la embarazada
-      await pool
-        .request()
-        .input("ID", id)
-        .query("DELETE FROM Embarazada WHERE ID_Embarazada = @ID");
-
-      res.send(
-        "🗑️ Embarazada y todos sus registros relacionados eliminados correctamente"
-      );
-    } catch (err) {
-      res.status(500).send("⚠ Error al eliminar: " + err.message);
-    }
-  });
-
-  /* ============================================================
-     CRUD SEGUIMIENTO
-  ============================================================ */
-  app.get("/seguimientos", async (req, res) => {
-    try {
-      const result = await getConnection()
-        .request()
-        .query("SELECT * FROM Seguimiento");
-      res.json(result.recordset);
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
-
-  app.post("/seguimientos", async (req, res) => {
-    const {
-      ID_Embarazada,
-      ID_Usuario,
-      Fecha_Seguimiento,
-      Observaciones,
-      Signos_Alarma,
-    } = req.body;
-    try {
-      await getConnection()
-        .request()
-        .input("ID_Embarazada", ID_Embarazada)
-        .input("ID_Usuario", ID_Usuario)
-        .input("Fecha_Seguimiento", Fecha_Seguimiento)
-        .input("Observaciones", Observaciones)
-        .input("Signos_Alarma", Signos_Alarma)
-        .query(`INSERT INTO Seguimiento (ID_Embarazada, ID_Usuario, Fecha_Seguimiento, Observaciones, Signos_Alarma)
-                VALUES (@ID_Embarazada, @ID_Usuario, @Fecha_Seguimiento, @Observaciones, @Signos_Alarma)`);
-      res.status(201).send("✅ Seguimiento registrado correctamente");
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
-
-  // ACTUALIZAR SEGUIMIENTO
-  app.put("/seguimientos/:id", async (req, res) => {
-    const { id } = req.params;
-    const { ID_Embarazada, ID_Usuario, Fecha_Seguimiento, Observaciones, Signos_Alarma } = req.body;
-
-    try {
-      const result = await getConnection()
-        .request()
-        .input("ID_Seguimiento", id)
-        .input("ID_Embarazada", ID_Embarazada)
-        .input("ID_Usuario", ID_Usuario)
-        .input("Fecha_Seguimiento", Fecha_Seguimiento)
-        .input("Observaciones", Observaciones)
-        .input("Signos_Alarma", Signos_Alarma)
-        .query(`
-          UPDATE Seguimiento
-          SET ID_Embarazada = @ID_Embarazada,
-              ID_Usuario = @ID_Usuario,
-              Fecha_Seguimiento = @Fecha_Seguimiento,
-              Observaciones = @Observaciones,
-              Signos_Alarma = @Signos_Alarma
-          WHERE ID_Seguimiento = @ID_Seguimiento
-        `);
-      
-      if (result.rowsAffected[0] === 0) {
-        return res.status(404).send("Seguimiento no encontrado");
+        if (checkDPI.recordset.length > 0) {
+          return res.status(409).json({ 
+            error: "⚠ Ya existe otra embarazada con ese DPI" 
+          });
+        }
       }
 
-      res.send("✅ Seguimiento actualizado correctamente");
+      if (Telefono) {
+        const checkTelefono = await pool
+          .request()
+          .input("Telefono", Telefono)
+          .input("ID", id)
+          .query("SELECT 1 FROM Embarazada WHERE Telefono = @Telefono AND ID_Embarazada != @ID");
+
+        if (checkTelefono.recordset.length > 0) {
+          return res.status(409).json({ 
+            error: "⚠ Ya existe otra embarazada con ese teléfono" 
+          });
+        }
+      }
+
+      // Actualizar
+      await pool
+        .request()
+        .input("ID", id)
+        .input("Nombre", Nombre)
+        .input("DPI", DPI)
+        .input("Edad", Edad)
+        .input("Telefono", Telefono)
+        .input("ID_Direccion", ID_Direccion)
+        .query(`
+          UPDATE Embarazada
+          SET Nombre=@Nombre, DPI=@DPI, Edad=@Edad, Telefono=@Telefono, ID_Direccion=@ID_Direccion
+          WHERE ID_Embarazada=@ID
+        `);
+
+      res.json({ message: "✅ Embarazada actualizada correctamente" });
     } catch (err) {
-      res.status(500).send(err.message);
+      console.error("Error al actualizar:", err);
+      res.status(500).json({ error: "⚠ Error al actualizar: " + err.message });
+    }
+  });
+
+
+  // ====== ELIMINAR EMBARAZADA + RELACIONES CON TRANSACCIÓN ======
+  app.delete("/embarazadas/:id", async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      const pool = getConnection();
+      const transaction = pool.transaction();
+
+      await transaction.begin();
+
+      try {
+        // Obtener ID_Direccion antes de eliminar
+        const getDireccion = await transaction
+          .request()
+          .input("ID", id)
+          .query("SELECT ID_Direccion FROM Embarazada WHERE ID_Embarazada = @ID");
+
+        const idDireccion = getDireccion.recordset[0]?.ID_Direccion;
+
+        // 1. Eliminar de Riesgo
+        await transaction
+          .request()
+          .input("ID", id)
+          .query("DELETE FROM Riesgo WHERE ID_Embarazada = @ID");
+
+        // 2. Eliminar de Seguimiento
+        await transaction
+          .request()
+          .input("ID", id)
+          .query("DELETE FROM Seguimiento WHERE ID_Embarazada = @ID");
+
+        // 3. Eliminar a la embarazada
+        await transaction
+          .request()
+          .input("ID", id)
+          .query("DELETE FROM Embarazada WHERE ID_Embarazada = @ID");
+
+        // 4. Eliminar dirección asociada (opcional)
+        if (idDireccion) {
+          await transaction
+            .request()
+            .input("ID_Direccion", idDireccion)
+            .query("DELETE FROM Direccion WHERE ID_Direccion = @ID_Direccion");
+        }
+
+        await transaction.commit();
+
+        res.json({ 
+          message: "🗑️ Embarazada y todos sus registros relacionados eliminados correctamente" 
+        });
+
+      } catch (err) {
+        await transaction.rollback();
+        throw err;
+      }
+
+    } catch (err) {
+      console.error("Error al eliminar:", err);
+      res.status(500).json({ error: "⚠ Error al eliminar: " + err.message });
     }
   });
 
