@@ -183,8 +183,6 @@ app.get("/", (req, res) => {
       }
     });
 
-
-
     app.delete("/usuarios/:id", async (req, res) => {
       const { id } = req.params;
       try {
