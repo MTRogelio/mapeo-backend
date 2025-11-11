@@ -19,7 +19,7 @@ app.use(
       if (
         origin.endsWith(".ngrok-free.app") ||
         origin.includes("onrender.com") ||
-        origin.includes("mapeo-proyecto2-tpaz.vercel.app")
+        origin.includes("mapeo-frontend.vercel.app")
       ) {
         callback(null, true);
       } else {
