@@ -368,12 +368,6 @@ app.get("/", (req, res) => {
     try {
       const pool = getConnection();
 
-      // Primero elimina de Ubicacion
-      await pool
-        .request()
-        .input("ID", id)
-        .query("DELETE FROM Ubicacion WHERE ID_Embarazada = @ID");
-
       // Luego elimina de Riesgo
       await pool
         .request()
