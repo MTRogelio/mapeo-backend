@@ -470,94 +470,94 @@ app.get("/", (req, res) => {
   /* ============================================================
      CRUD RIESGO
   ============================================================ */
-  app.get("/riesgos", async (req, res) => {
-    try {
-      const result = await getConnection().request().query(`
-      SELECT r.ID_Riesgo, r.ID_Embarazada, e.Nombre AS NombreEmbarazada, r.Fecha_Riesgo, r.Nivel
-      FROM Riesgo r
-      INNER JOIN Embarazada e ON r.ID_Embarazada = e.ID_Embarazada
-    `);
-      res.json(result.recordset);
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
+    app.get("/riesgos", async (req, res) => {
+      try {
+        const result = await getConnection().request().query(`
+        SELECT r.ID_Riesgo, r.ID_Embarazada, e.Nombre AS NombreEmbarazada, r.Fecha_Riesgo, r.Nivel
+        FROM Riesgo r
+        INNER JOIN Embarazada e ON r.ID_Embarazada = e.ID_Embarazada
+      `);
+        res.json(result.recordset);
+      } catch (err) {
+        res.status(500).send(err.message);
+      }
+    });
 
-  // Obtener conteo de riesgos por nivel
-  app.get("/reportes/riesgos", async (req, res) => {
+    // Obtener conteo de riesgos por nivel
+    app.get("/reportes/riesgos", async (req, res) => {
+      try {
+        const result = await getConnection()
+          .request()
+          .query(`
+            SELECT Nivel, COUNT(*) AS Cantidad
+            FROM Riesgo
+            GROUP BY Nivel
+          `);
+
+        res.json(result.recordset); 
+      } catch (err) {
+        res.status(500).send(err.message);
+      }
+    });
+
+    app.post("/riesgos", async (req, res) => {
+      const { ID_Embarazada, Fecha_Riesgo, Nivel } = req.body;
+      try {
+        const pool = getConnection();
+
+        // Verificar que la embarazada exista
+        const check = await pool
+          .request()
+          .input("ID", ID_Embarazada)
+          .query("SELECT 1 FROM Embarazada WHERE ID_Embarazada=@ID");
+
+        if (check.recordset.length === 0) {
+          return res.status(400).send("⚠ Error: La embarazada no existe");
+        }
+
+        // Insertar riesgo
+        await pool
+          .request()
+          .input("ID_Embarazada", ID_Embarazada)
+          .input("Fecha_Riesgo", Fecha_Riesgo)
+          .input("Nivel", Nivel)
+          .query(
+            "INSERT INTO Riesgo (ID_Embarazada, Fecha_Riesgo, Nivel) VALUES (@ID_Embarazada, @Fecha_Riesgo, @Nivel)"
+          );
+
+        res.status(201).send("✅ Riesgo registrado correctamente");
+      } catch (err) {
+        res.status(500).send("⚠ Error: " + err.message);
+      }
+    });
+
+    app.put("/riesgos/:id", async (req, res) => {
+    const { id } = req.params;
+    const { ID_Embarazada, Fecha_Riesgo, Nivel } = req.body;
+
     try {
       const result = await getConnection()
         .request()
+        .input("ID_Riesgo", id)
+        .input("ID_Embarazada", ID_Embarazada)
+        .input("Fecha_Riesgo", Fecha_Riesgo)
+        .input("Nivel", Nivel)
         .query(`
-          SELECT Nivel, COUNT(*) AS Cantidad
-          FROM Riesgo
-          GROUP BY Nivel
+          UPDATE Riesgo
+          SET ID_Embarazada = @ID_Embarazada,
+              Fecha_Riesgo = @Fecha_Riesgo,
+              Nivel = @Nivel
+          WHERE ID_Riesgo = @ID_Riesgo
         `);
 
-      res.json(result.recordset); 
+      if (result.rowsAffected[0] === 0)
+        return res.status(404).send("❌ Riesgo no encontrado");
+
+      res.send("✅ Riesgo actualizado correctamente");
     } catch (err) {
       res.status(500).send(err.message);
     }
   });
-
-  app.post("/riesgos", async (req, res) => {
-    const { ID_Embarazada, Fecha_Riesgo, Nivel } = req.body;
-    try {
-      const pool = getConnection();
-
-      // Verificar que la embarazada exista
-      const check = await pool
-        .request()
-        .input("ID", ID_Embarazada)
-        .query("SELECT 1 FROM Embarazada WHERE ID_Embarazada=@ID");
-
-      if (check.recordset.length === 0) {
-        return res.status(400).send("⚠ Error: La embarazada no existe");
-      }
-
-      // Insertar riesgo
-      await pool
-        .request()
-        .input("ID_Embarazada", ID_Embarazada)
-        .input("Fecha_Riesgo", Fecha_Riesgo)
-        .input("Nivel", Nivel)
-        .query(
-          "INSERT INTO Riesgo (ID_Embarazada, Fecha_Riesgo, Nivel) VALUES (@ID_Embarazada, @Fecha_Riesgo, @Nivel)"
-        );
-
-      res.status(201).send("✅ Riesgo registrado correctamente");
-    } catch (err) {
-      res.status(500).send("⚠ Error: " + err.message);
-    }
-  });
-
-  app.put("/riesgos/:id", async (req, res) => {
-  const { id } = req.params;
-  const { ID_Embarazada, Fecha_Riesgo, Nivel } = req.body;
-
-  try {
-    const result = await getConnection()
-      .request()
-      .input("ID_Riesgo", id)
-      .input("ID_Embarazada", ID_Embarazada)
-      .input("Fecha_Riesgo", Fecha_Riesgo)
-      .input("Nivel", Nivel)
-      .query(`
-        UPDATE Riesgo
-        SET ID_Embarazada = @ID_Embarazada,
-            Fecha_Riesgo = @Fecha_Riesgo,
-            Nivel = @Nivel
-        WHERE ID_Riesgo = @ID_Riesgo
-      `);
-
-    if (result.rowsAffected[0] === 0)
-      return res.status(404).send("❌ Riesgo no encontrado");
-
-    res.send("✅ Riesgo actualizado correctamente");
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
 
 
 
