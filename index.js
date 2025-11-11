@@ -340,9 +340,7 @@ app.get("/", (req, res) => {
   });
 
 
-  /* ============================================================
-     ACTUALIZAR EMBARAZADA
-  ============================================================ */
+  /*ACTUALIZAR EMBARAZADA*/
   app.put("/embarazadas/:id", async (req, res) => {
     const { id } = req.params;
     const { Nombre, Edad, Telefono, ID_Direccion } = req.body;
@@ -364,9 +362,7 @@ app.get("/", (req, res) => {
     }
   });
 
-  /* ============================================================
-     ELIMINAR EMBARAZADA + RELACIONES
-  ============================================================ */
+  /*ELIMINAR EMBARAZADA + RELACIONES*/
   app.delete("/embarazadas/:id", async (req, res) => {
     const { id } = req.params;
     try {
@@ -471,85 +467,6 @@ app.get("/", (req, res) => {
       }
 
       res.send("✅ Seguimiento actualizado correctamente");
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
-
-
-  /* ============================================================
-     CRUD UBICACION
-  ============================================================ */
-  app.get("/ubicaciones", async (req, res) => {
-    try {
-      const result = await getConnection().request().query(`
-        SELECT u.ID_Ubicacion,
-              u.ID_Embarazada,
-              e.Nombre AS NombreEmbarazada,
-              e.Edad,
-              u.ID_Direccion,
-              d.Calle, d.Ciudad, d.Departamento,
-              u.Fecha_Registro
-        FROM Ubicacion u
-        INNER JOIN Embarazada e ON u.ID_Embarazada = e.ID_Embarazada
-        INNER JOIN Direccion d ON u.ID_Direccion = d.ID_Direccion
-        ORDER BY u.ID_Ubicacion
-      `);
-      res.json(result.recordset);
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
-
-  app.post("/ubicaciones", async (req, res) => {
-    const { ID_Embarazada, ID_Direccion } = req.body;
-    try {
-      await getConnection()
-        .request()
-        .input("ID_Embarazada", ID_Embarazada)
-        .input("ID_Direccion", ID_Direccion)
-        .query(
-          "INSERT INTO Ubicacion (ID_Embarazada, ID_Direccion) VALUES (@ID_Embarazada, @ID_Direccion)"
-        );
-      res.status(201).send("✅ Ubicación registrada correctamente");
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
-
-  app.delete("/ubicaciones/:id", async (req, res) => {
-    const { id } = req.params;
-    try {
-      await getConnection()
-        .request()
-        .input("ID_Ubicacion", id)
-        .query("DELETE FROM Ubicacion WHERE ID_Ubicacion = @ID_Ubicacion");
-      res.sendStatus(204);
-    } catch (err) {
-      res.status(500).send(err.message);
-    }
-  });
-
-  // ✅ EDITAR UBICACIÓN (PUT)
-  app.put("/ubicaciones/:id", async (req, res) => {
-    const { id } = req.params;
-    const { ID_Embarazada, ID_Direccion } = req.body;
-    try {
-      const result = await getConnection()
-        .request()
-        .input("ID_Ubicacion", id)
-        .input("ID_Embarazada", ID_Embarazada)
-        .input("ID_Direccion", ID_Direccion)
-        .query(`
-          UPDATE Ubicacion
-          SET ID_Embarazada = @ID_Embarazada,
-              ID_Direccion = @ID_Direccion
-          WHERE ID_Ubicacion = @ID_Ubicacion
-        `);
-
-      if (result.rowsAffected[0] === 0)
-        return res.status(404).send("❌ No se encontró la ubicación");
-      res.send("✅ Ubicación actualizada correctamente");
     } catch (err) {
       res.status(500).send(err.message);
     }
