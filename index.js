@@ -271,7 +271,7 @@ app.get("/", (req, res) => {
   app.get("/embarazadas-con-direccion", async (req, res) => {
     try {
       const result = await getConnection().request().query(`
-        SELECT e.ID_Embarazada, e.Nombre, e.Edad, d.Latitud, d.Longitud, d.Municipio, r.Nivel
+        SELECT e.ID_Embarazada, e.Nombre, e.DPI, e.Edad, d.Latitud, d.Longitud, d.Municipio, r.Nivel
         FROM Embarazada e
         INNER JOIN Direccion d ON e.ID_Direccion = d.ID_Direccion
         INNER JOIN Riesgo r ON e.ID_Embarazada = r.ID_Embarazada
@@ -288,6 +288,7 @@ app.get("/", (req, res) => {
       Nombre,
       Edad,
       Telefono,
+      DPI,
       Calle,
       Ciudad,
       Departamento,
@@ -318,6 +319,7 @@ app.get("/", (req, res) => {
         .input("Nombre", Nombre)
         .input("Edad", Edad)
         .input("Telefono", Telefono)
+        .input("DPI", DPI)
         .input("Calle", Calle)
         .input("Ciudad", Ciudad)
         .input("Departamento", Departamento)
@@ -351,6 +353,7 @@ app.get("/", (req, res) => {
               e.Nombre,
               e.Edad,
               e.Telefono,
+              e.DPI,
               e.ID_Direccion,
               d.Calle,
               d.Ciudad,
@@ -374,7 +377,7 @@ app.get("/", (req, res) => {
   /*ACTUALIZAR EMBARAZADA*/
   app.put("/embarazadas/:id", async (req, res) => {
     const { id } = req.params;
-    const { Nombre, Edad, Telefono, ID_Direccion } = req.body;
+    const { Nombre, Edad, Telefono, DPI, ID_Direccion } = req.body;
     try {
       await getConnection()
         .request()
@@ -382,9 +385,10 @@ app.get("/", (req, res) => {
         .input("Nombre", Nombre)
         .input("Edad", Edad)
         .input("TELEFONO", Telefono)
+        .input("DPI", DPI)
         .input("ID_Direccion", ID_Direccion).query(`
         UPDATE Embarazada
-        SET Nombre=@Nombre, Edad=@Edad, Telefono=@TELEFONO, ID_Direccion=@ID_Direccion
+        SET Nombre=@Nombre, Edad=@Edad, Telefono=@TELEFONO, DPI=@DPI, ID_Direccion=@ID_Direccion
         WHERE ID_Embarazada=@ID
       `);
       res.send("✅ Embarazada actualizada correctamente");
