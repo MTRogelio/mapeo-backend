@@ -271,7 +271,7 @@ app.get("/", (req, res) => {
   app.get("/embarazadas-con-direccion", async (req, res) => {
     try {
       const result = await getConnection().request().query(`
-        SELECT e.ID_Embarazada, e.Nombre, e.DPI, e.Edad, d.Latitud, d.Longitud, d.Municipio, r.Nivel
+        SELECT e.ID_Embarazada, e.Nombre, e.Telefono e.DPI, e.Edad, d.Latitud, d.Longitud, d.Municipio, r.Nivel
         FROM Embarazada e
         INNER JOIN Direccion d ON e.ID_Direccion = d.ID_Direccion
         INNER JOIN Riesgo r ON e.ID_Embarazada = r.ID_Embarazada
@@ -384,11 +384,11 @@ app.get("/", (req, res) => {
         .input("ID", id)
         .input("Nombre", Nombre)
         .input("Edad", Edad)
-        .input("TELEFONO", Telefono)
+        .input("Telefono", Telefono)
         .input("DPI", DPI)
         .input("ID_Direccion", ID_Direccion).query(`
         UPDATE Embarazada
-        SET Nombre=@Nombre, Edad=@Edad, Telefono=@TELEFONO, DPI=@DPI, ID_Direccion=@ID_Direccion
+        SET Nombre=@Nombre, Edad=@Edad, Telefono=@Telefono, DPI=@DPI, ID_Direccion=@ID_Direccion
         WHERE ID_Embarazada=@ID
       `);
       res.send("✅ Embarazada actualizada correctamente");
