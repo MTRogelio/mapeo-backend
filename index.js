@@ -598,6 +598,25 @@ app.get("/", (req, res) => {
   }
 });
 
+app.delete("/riesgos/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await getConnection()
+      .request()
+      .input("ID_Riesgo", id)
+      .query("DELETE FROM Riesgo WHERE ID_Riesgo = @ID_Riesgo");
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).send("❌ Riesgo no encontrado");
+    }
+
+    res.send("✅ Riesgo eliminado correctamente");
+  } catch (err) {
+    res.status(500).send("⚠ Error: " + err.message);
+  }
+});
+
 
 
   /* ============================================================
